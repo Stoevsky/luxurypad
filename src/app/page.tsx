@@ -3,6 +3,7 @@ import { Container, Eyebrow, ButtonLink, Card, Rule } from "@/components/ui";
 import { MarketCard } from "@/components/market-card";
 import { LaunchCard } from "@/components/launch-card";
 import { StatsBand } from "@/components/stats-band";
+import { SectorTile } from "@/components/sector-tile";
 import { resolveLuxuryMarkets } from "@/lib/registry/resolve";
 import {
   listLaunches,
@@ -205,15 +206,13 @@ export default async function HomePage() {
       <section className="border-b border-line">
         <Container className="py-16 sm:py-20">
           <Eyebrow>Luxury sectors</Eyebrow>
-          <div className="mt-7 flex flex-wrap gap-2">
+          <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             {SECTOR_ORDER.filter((s) => markets.some((m) => m.company.sector === s)).map((s) => (
-              <Link
+              <SectorTile
                 key={s}
-                href={`/markets#${s}`}
-                className="border border-line bg-card px-4 py-2 text-[13px] transition-colors duration-200 hover:border-gold"
-              >
-                {SECTOR_LABELS[s]}
-              </Link>
+                sector={s}
+                count={markets.filter((m) => m.company.sector === s).length}
+              />
             ))}
           </div>
         </Container>
