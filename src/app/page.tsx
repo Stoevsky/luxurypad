@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 import { Container, Eyebrow, ButtonLink, Card, Rule } from "@/components/ui";
 import { MarketCard } from "@/components/market-card";
 import { LaunchCard } from "@/components/launch-card";
@@ -71,7 +72,10 @@ export default async function HomePage() {
     <>
       {/* ——— Hero ——— */}
       <section className="border-b border-line">
-        <Container className="grid gap-12 py-20 lg:grid-cols-[1.05fr_1fr] lg:items-center lg:py-28">
+        {/* items-start, not items-center: the texture column is far taller than
+            the copy, and centring split the difference into equal voids above
+            and below the headline — which pushed the headline under the fold. */}
+        <Container className="grid gap-12 py-20 lg:grid-cols-[1.05fr_1fr] lg:items-start lg:py-24">
           <div className="reveal space-y-7">
             <Eyebrow>Pons V2 · Robinhood Chain</Eyebrow>
             <h1 className="display text-[clamp(2.9rem,7vw,4.6rem)]">
@@ -93,40 +97,53 @@ export default async function HomePage() {
             </div>
           </div>
 
-          {/* Product UI as the hero visual — not stock supercar photography. */}
-          <Card className="p-6">
-            <div className="flex items-baseline justify-between">
-              <p className="eyebrow">Verified launch pairs</p>
-              <p className="tabular text-[13px] text-muted">{launchable.length} live</p>
+          {/* Product UI as the hero visual — not stock supercar photography.
+              The texture frames that card; it does not replace it. */}
+          <div className="relative">
+            <div className="relative aspect-[4/5] overflow-hidden border border-line">
+              <Image
+                src="/textures/hero.webp"
+                alt=""
+                fill
+                priority
+                sizes="(min-width: 1024px) 42vw, 100vw"
+                className="object-cover"
+              />
             </div>
-            <Rule className="my-4" />
-            <ul className="space-y-3.5">
-              {launchable.slice(0, 5).map((m) => (
-                <li key={m.company.id} className="flex items-center justify-between gap-4">
-                  <div className="min-w-0">
-                    <p className="truncate text-[14px]">{m.company.companyName}</p>
-                    <p className="text-[11px] uppercase tracking-[0.12em] text-muted">
-                      {m.asset?.symbol} · {SECTOR_LABELS[m.company.sector]}
+            <Card className="relative -mt-20 mx-4 p-6 shadow-[0_18px_40px_-28px_rgb(17_16_15/0.55)] sm:mx-8">
+              <div className="flex items-baseline justify-between">
+                <p className="eyebrow">Verified launch pairs</p>
+                <p className="tabular text-[13px] text-muted">{launchable.length} live</p>
+              </div>
+              <Rule className="my-4" />
+              <ul className="space-y-3.5">
+                {launchable.slice(0, 5).map((m) => (
+                  <li key={m.company.id} className="flex items-center justify-between gap-4">
+                    <div className="min-w-0">
+                      <p className="truncate text-[14px]">{m.company.companyName}</p>
+                      <p className="text-[11px] uppercase tracking-[0.12em] text-muted">
+                        {m.asset?.symbol} · {SECTOR_LABELS[m.company.sector]}
+                      </p>
+                    </div>
+                    <p className="tabular shrink-0 text-[14px]">
+                      {m.quote ? `$${m.quote.ask.toFixed(2)}` : "—"}
                     </p>
-                  </div>
-                  <p className="tabular shrink-0 text-[14px]">
-                    {m.quote ? `$${m.quote.ask.toFixed(2)}` : "—"}
-                  </p>
-                </li>
-              ))}
-              {launchable.length === 0 ? (
-                <li className="py-4 text-[13px] text-muted">
-                  {registryUnavailable
-                    ? "The asset registry is unavailable right now."
-                    : "No launch pairs are currently available."}
-                </li>
-              ) : null}
-            </ul>
-            <Rule className="my-4" />
-            <p className="text-[11px] leading-relaxed text-muted">
-              Every pair above was confirmed against the Pons launch contract before being shown.
-            </p>
-          </Card>
+                  </li>
+                ))}
+                {launchable.length === 0 ? (
+                  <li className="py-4 text-[13px] text-muted">
+                    {registryUnavailable
+                      ? "The asset registry is unavailable right now."
+                      : "No launch pairs are currently available."}
+                  </li>
+                ) : null}
+              </ul>
+              <Rule className="my-4" />
+              <p className="text-[11px] leading-relaxed text-muted">
+                Every pair above was confirmed against the Pons launch contract before being shown.
+              </p>
+            </Card>
+          </div>
         </Container>
       </section>
 
@@ -219,8 +236,17 @@ export default async function HomePage() {
       </section>
 
       {/* ——— Final CTA ——— */}
-      <section>
-        <Container className="py-20 text-center sm:py-28">
+      <section className="relative overflow-hidden">
+        {/* The hero texture again, far back. It bookends the page without
+            competing with the type in front of it. */}
+        <Image
+          src="/textures/hero.webp"
+          alt=""
+          fill
+          sizes="100vw"
+          className="object-cover opacity-[0.14]"
+        />
+        <Container className="relative py-20 text-center sm:py-28">
           <h2 className="display text-[clamp(2.2rem,5.5vw,3.4rem)]">Launch something iconic.</h2>
           <div className="mt-8 flex justify-center">
             <ButtonLink href="/launch" size="lg">

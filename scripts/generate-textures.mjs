@@ -401,22 +401,32 @@ const TEXTURES = [
         // uses the height. An earlier version split silk from stone across a
         // horizontal seam, which in portrait read as a landscape horizon.
         const silk =
-          band(0.52, 2.4, foldWave(p, u, v, { angle: 0.08, count: 2.4, warp: 0.18 })) +
-          band(0.15, 5.8, foldWave(p, u, v, { angle: 0.08, count: 5.8, warp: 0.13, seed: 6 })) +
-          band(0.09, 150, weave(u, v, 150)) +
+          band(0.68, 2.4, foldWave(p, u, v, { angle: 0.08, count: 2.4, warp: 0.18 })) +
+          band(0.22, 5.8, foldWave(p, u, v, { angle: 0.08, count: 5.8, warp: 0.13, seed: 6 })) +
+          band(0.11, 150, weave(u, v, 150)) +
           band(0.07, 30, fbm(p, u * 26, v * 26, 3));
 
         // A single torn ribbon of leaf, laid on the diagonal so it cuts across
         // the folds instead of lying along them.
+        //
+        // The edge is a band with a flat core, not a peak: `1 - smoothstep` from
+        // zero gave the ribbon no interior at all, just two soft shoulders that
+        // met in the middle, and at hero resolution that blurred into a stain.
         const seam = u * 0.82 + v * 0.58 - 0.74 + 0.06 * fbm(q, u * 2.6, v * 3.4, 4);
-        const ribbon = 1 - smoothstep(0, 0.1, Math.abs(seam));
-        const tear = smoothstep(0.24, 0.62, 0.5 + 0.5 * fbm(q, u * 5 + 21, v * 6 + 5, 4));
+        const ribbon = 1 - smoothstep(0.055, 0.135, Math.abs(seam));
+        // Erosion only nibbles the ribbon now. At 0.24..0.62 it ate through the
+        // middle and left disconnected blobs strung along the diagonal.
+        const tear = smoothstep(0.1, 0.44, 0.5 + 0.5 * fbm(q, u * 5 + 21, v * 6 + 5, 4));
         const leaf = clamp01(ribbon * tear);
+        // Facet scale matched to `materials`, which is the one that reads as
+        // metal. At frequency 26 the facets were finer than the ribbon is wide,
+        // so no single facet could catch the light — the flashes averaged out
+        // into grey-brown noise instead of glinting.
         const crinkle =
           leaf *
-          (band(0.85, 26, ridged(q, u * 17, v * 17, 3) - 0.5) +
-            band(0.3, 80, ridged(q, u * 58, v * 58, 3) - 0.5) +
-            band(0.14, 150, fbm(q, u * 120, v * 120, 2)));
+          (band(1.15, 11, ridged(q, u * 7, v * 7, 2) - 0.5) +
+            band(0.5, 30, ridged(q, u * 21, v * 21, 3) - 0.5) +
+            band(0.14, 110, fbm(q, u * 90, v * 90, 2)));
 
         const t = 0.02 + 0.03 * (0.5 + 0.5 * fbm(q, u * 4, v * 4, 3));
         const sheen = clamp01(0.5 + 0.5 * fbm(p, u * 1.3 + 30, v * 1.3, 3)) * 0.2;
@@ -424,7 +434,10 @@ const TEXTURES = [
           h: silk + crinkle,
           t: clamp01(t),
           g: clamp01(leaf * 0.95 + sheen * (1 - leaf)),
-          d: lerp(1, 0.36, leaf),
+          // 0.36 was too dark to be gold. Metal wants a dim diffuse, but dim
+          // enough and the pigment stops reading as a metal and starts reading
+          // as dirt — which is exactly what it looked like.
+          d: lerp(1, 0.62, leaf),
           s: lerp(0.12, 1, leaf),
         };
       },
