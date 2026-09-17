@@ -19,15 +19,27 @@ type Preflight = {
   error?: string;
 };
 
-const SECTOR_FILTERS: Array<{ id: "all" | LuxurySector; label: string }> = [
-  { id: "all", label: "All" },
-  { id: "fashion", label: "Fashion" },
-  { id: "automotive", label: "Automotive" },
-  { id: "watches", label: "Watches" },
-  { id: "materials", label: "Materials" },
-  { id: "beauty", label: "Beauty" },
-  { id: "hospitality", label: "Hospitality" },
-];
+/**
+ * Sector tabs are derived from the launchable set, not hardcoded.
+ *
+ * A fixed list promised six categories while only three of them can ever hold
+ * a verified pair — Watches, Beauty and Hospitality have no approved pair token
+ * on this deployment at all. Clicking those was a guaranteed dead end that read
+ * as a broken page rather than as an honest "nothing here yet".
+ */
+export function sectorFilters(
+  launchable: Array<{ company: { sector: LuxurySector } }>,
+): Array<{ id: "all" | LuxurySector; label: string; count: number }> {
+  const counts = new Map<LuxurySector, number>();
+  for (const m of launchable) {
+    counts.set(m.company.sector, (counts.get(m.company.sector) ?? 0) + 1);
+  }
+  const sectors = [...counts.entries()]
+    .sort((a, b) => b[1] - a[1] || SECTOR_LABELS[a[0]].localeCompare(SECTOR_LABELS[b[0]]))
+    .map(([sector, count]) => ({ id: sector, label: SECTOR_LABELS[sector], count }));
+
+  return [{ id: "all" as const, label: "All", count: launchable.length }, ...sectors];
+}
 
 const STEPS = ["Market", "Create", "Economics", "Review"] as const;
 
@@ -44,6 +56,7 @@ export function LaunchWizard({
   const { address, isConnected } = useAccount();
 
   const launchable = useMemo(() => markets.filter((m) => m.launchable), [markets]);
+  const filters = useMemo(() => sectorFilters(launchable), [launchable]);
   const [step, setStep] = useState(0);
   const [filter, setFilter] = useState<"all" | LuxurySector>("all");
   const [selected, setSelected] = useState<LuxuryMarket | null>(
@@ -228,7 +241,7 @@ export function LaunchWizard({
       {step === 0 ? (
         <section className="mt-8">
           <div className="flex flex-wrap gap-2">
-            {SECTOR_FILTERS.map((f) => (
+            {filters.map((f) => (
               <button
                 key={f.id}
                 onClick={() => setFilter(f.id)}
@@ -236,14 +249,16 @@ export function LaunchWizard({
                   filter === f.id ? "border-ink bg-ink text-ground" : "border-line bg-card hover:border-gold"
                 }`}
               >
-                {f.label}
+                {f.label} <span className="tabular text-[11px] opacity-60">{f.count}</span>
               </button>
             ))}
           </div>
 
           {filtered.length === 0 ? (
             <Card className="mt-6 p-8 text-center text-[13px] text-muted">
-              No verified launch pairs in this category.
+              {degraded
+                ? "No pair could be verified on chain just now. This is a connectivity problem, not an empty registry — reload in a moment."
+                : "No verified launch pairs in this category."}
             </Card>
           ) : (
             <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
