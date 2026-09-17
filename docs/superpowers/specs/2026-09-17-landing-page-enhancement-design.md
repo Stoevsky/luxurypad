@@ -47,6 +47,16 @@ so Next optimises them — unlike the remote CDN logos, which require
 Each is keyed to the existing tokens: ground `#f4f0e8`, ink `#11100f`, gold
 `#b99a62`, champagne `#d8c5a0`.
 
+They are generated procedurally by `scripts/generate-textures.mjs`, not by an
+image model. Each is a lit height field: normals are taken from the height by
+central difference and shaded against a directional light, which is what makes
+silk read as folded cloth and guilloché as cut metal rather than as tinted noise.
+Three consequences matter. The palette cannot stray outside the four tokens. The
+script has no means of drawing a glyph or a mark, so "no brand marks" is
+structural rather than something a prompt was asked for and trusted to honour.
+And fixed seeds make the output byte-for-byte reproducible, so a texture is
+retuned by editing a number rather than by re-rolling and hoping.
+
 | File | Use | Subject |
 | --- | --- | --- |
 | `hero.webp` | Hero, closing CTA | Layered silk, gold leaf and stone; macro; portrait |

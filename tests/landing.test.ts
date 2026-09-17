@@ -1,6 +1,8 @@
 import { describe, it, expect } from "vitest";
+import { existsSync } from "node:fs";
+import { join } from "node:path";
 import { summarizeLaunches } from "@/lib/landing/stats";
-import { sectorTexture } from "@/lib/registry/sector-art";
+import { SECTOR_TEXTURES, sectorTexture } from "@/lib/registry/sector-art";
 import { LUXURY_COMPANIES } from "@/lib/registry/luxury";
 import type { LaunchSummary } from "@/lib/indexer/launches";
 import type { LaunchPhase } from "@/lib/pons/curve";
@@ -74,5 +76,19 @@ describe("sectorTexture", () => {
 
   it("returns a path under /textures", () => {
     expect(sectorTexture("fashion")).toMatch(/^\/textures\/.+\.webp$/);
+  });
+
+  it("points every mapped sector at a file that is actually on disk", () => {
+    // The mapping being well-formed is not the same as the artwork existing.
+    // Without this, deleting a texture still passes every other test here and
+    // the failure surfaces as a broken image on the live landing page.
+    for (const [sector, href] of Object.entries(SECTOR_TEXTURES)) {
+      const file = join(process.cwd(), "public", href!.replace(/^\//, ""));
+      expect(existsSync(file), `${sector} maps to ${href}, which is missing`).toBe(true);
+    }
+  });
+
+  it("has the hero image the page and closing CTA both reference", () => {
+    expect(existsSync(join(process.cwd(), "public", "textures", "hero.webp"))).toBe(true);
   });
 });

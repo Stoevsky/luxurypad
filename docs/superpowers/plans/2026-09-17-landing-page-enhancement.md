@@ -250,8 +250,20 @@ mkdir -p public/textures
 
 - [ ] **Step 2: Generate the images**
 
-Use `generate_image_batch` with the eight prompts below, then `jobs_wait`, then
-`show_generation_by_ids` to collect URLs.
+> **Changed during execution.** The image-generation MCP turned out to be
+> unusable: the account holds 0 credits on a free plan with no unlimited
+> allowance, so `generate_image_batch` could only have proceeded by spending the
+> user's money on an unasked-for purchase. The textures are generated instead by
+> `scripts/generate-textures.mjs` (Node + `sharp`, both already in the tree).
+>
+> This meets the brief more strictly than a prompt could. The palette is
+> restricted to the four tokens by construction rather than by asking; nothing in
+> the script is capable of drawing a glyph, a logo or a product, so the "no brand
+> marks" requirement is structural rather than hoped for; and the output is
+> byte-for-byte reproducible from fixed seeds, verified by hashing two
+> consecutive runs. Run it with `node scripts/generate-textures.mjs`.
+>
+> The subject clauses below are kept as the design intent each texture implements.
 
 Every prompt ends with the same constraint clause, because the legal and
 editorial requirement is identical for all eight:
