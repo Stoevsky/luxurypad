@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Container } from "@/components/ui";
 import { ConnectWallet, UnsupportedNetworkNotice } from "@/components/connect-wallet";
 import { SearchTrigger } from "@/components/search";
+import { Crown } from "@/components/crown";
 
 const NAV = [
   { href: "/explore", label: "Explore" },
@@ -17,8 +18,9 @@ export function SiteHeader() {
       <UnsupportedNetworkNotice />
       <Container className="flex h-16 items-center justify-between gap-4">
         <div className="flex items-center gap-8">
-          <Link href="/" className="display text-[22px] tracking-[-0.03em]">
-            LuxuryPad
+          <Link href="/" className="flex items-center gap-2.5">
+            <Crown className="h-[22px] w-[22px] shrink-0" />
+            <span className="display text-[22px] tracking-[-0.03em]">LuxuryPad</span>
           </Link>
           <nav className="hidden items-center gap-6 md:flex">
             {NAV.map((item) => (

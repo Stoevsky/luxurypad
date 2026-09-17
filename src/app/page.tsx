@@ -3,6 +3,7 @@ import Image from "next/image";
 import { Container, Eyebrow, ButtonLink, Card, Rule } from "@/components/ui";
 import { MarketCard } from "@/components/market-card";
 import { LaunchCard } from "@/components/launch-card";
+import { HeroPreview } from "@/components/hero-preview";
 import { StatsBand } from "@/components/stats-band";
 import { SectorTile } from "@/components/sector-tile";
 import { resolveLuxuryMarkets } from "@/lib/registry/resolve";
@@ -29,6 +30,9 @@ export const revalidate = 60;
  * same capped sample and so stays mutually consistent.
  */
 const HYDRATION_CAP = 120;
+
+/** Pons uses the zero address to mean the chain's native asset. */
+const NATIVE = "0x0000000000000000000000000000000000000000";
 
 const STEPS = [
   { n: "01", title: "Choose the market", body: "Pick from supported luxury-market assets." },
@@ -68,11 +72,16 @@ export default async function HomePage() {
     (registry ?? []).map((a) => [a.address.toLowerCase(), a.symbol]),
   );
 
+  // The hero preview needs a launch that is still on its curve: a graduated one
+  // would render a trade panel the real page replaces with a "curve is closed"
+  // notice, so it would be showing a screen that cannot exist for that token.
+  const heroLaunch = launches.find((l) => l.phase === "curve") ?? launches[0] ?? null;
+
   return (
     <>
       {/* ——— Hero ——— */}
       <section className="border-b border-line">
-        {/* items-start, not items-center: the texture column is far taller than
+        {/* items-start, not items-center: the right column is far taller than
             the copy, and centring split the difference into equal voids above
             and below the headline — which pushed the headline under the fold. */}
         <Container className="grid gap-12 py-20 lg:grid-cols-[1.05fr_1fr] lg:items-start lg:py-24">
@@ -97,20 +106,25 @@ export default async function HomePage() {
             </div>
           </div>
 
-          {/* Product UI as the hero visual — not stock supercar photography.
-              The texture frames that card; it does not replace it. */}
-          <div className="relative">
-            <div className="relative aspect-[4/5] overflow-hidden border border-line">
-              <Image
-                src="/textures/hero.webp"
-                alt=""
-                fill
-                priority
-                sizes="(min-width: 1024px) 42vw, 100vw"
-                className="object-cover"
-              />
-            </div>
-            <Card className="relative -mt-20 mx-4 p-6 shadow-[0_18px_40px_-28px_rgb(17_16_15/0.55)] sm:mx-8">
+          {/* Product UI as the hero visual — not stock supercar photography and
+              no longer a texture panel either. Showing the actual trade surface
+              says more about what this is than any image could. */}
+          <div className="space-y-4">
+            {/* Rendered even with no launch to show. The RPC rate-limits often
+                enough that dropping the panel would leave the hero's right
+                column collapsing at random; the shell degrades field by field
+                instead, the same way the stats band does. */}
+            <HeroPreview
+              launch={heroLaunch}
+              quoteSymbol={
+                !heroLaunch
+                  ? null
+                  : heroLaunch.quoteAsset === NATIVE
+                    ? "ETH"
+                    : symbolByAddress.get(heroLaunch.quoteAsset.toLowerCase()) ?? "pair asset"
+              }
+            />
+            <Card className="p-6">
               <div className="flex items-baseline justify-between">
                 <p className="eyebrow">Verified launch pairs</p>
                 <p className="tabular text-[13px] text-muted">{launchable.length} live</p>
