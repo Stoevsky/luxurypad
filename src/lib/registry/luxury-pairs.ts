@@ -24,6 +24,20 @@ import type { StockTokenAsset } from "./stock-tokens";
  * Pons addresses are: a wrong value here points a launch at the wrong token.
  * Every entry is still verified on chain before it is shown — an address that
  * does not answer as an ERC-20 is dropped rather than displayed.
+ *
+ * BEFORE ADDING AN ENTRY, READ THIS. Resolving as an ERC-20 is necessary but
+ * not sufficient: `resolve.ts` marks a market launchable only when the factory's
+ * `approvedPairTokens` returns true for it. On the pinned PONS_V2_MAINNET
+ * deployment that allowlist belongs to Pons, so a token deployed by this project
+ * will resolve, render, and then never be launchable — it shows up as
+ * DISCOVERY_ONLY with no explanation of why.
+ *
+ * Checked against the live factory on 2026-09-18: 66 of the 194 registry assets
+ * are approved, plus native ETH, USDG and cbBTC. None of them is a luxury house
+ * — no LVMH, Hermès, Richemont, Kering, Ferrari, Prada, Moncler, Burberry,
+ * Swatch or Estée Lauder is tokenised on this chain at all. So this route is
+ * only useful against a Pons deployment whose allowlist you control; against the
+ * pinned one it cannot work, and the map stays empty deliberately.
  */
 export const LUXURY_PAIR_ASSETS: Record<number, Partial<Record<string, Address>>> = {
   // 4663: { ferrari: "0x…", lvmh: "0x…" },
