@@ -1,5 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { summarizeLaunches } from "@/lib/landing/stats";
+import { sectorTexture } from "@/lib/registry/sector-art";
+import { LUXURY_COMPANIES } from "@/lib/registry/luxury";
 import type { LaunchSummary } from "@/lib/indexer/launches";
 import type { LaunchPhase } from "@/lib/pons/curve";
 
@@ -49,5 +51,28 @@ describe("summarizeLaunches", () => {
     const stats = summarizeLaunches([launch("ready_to_graduate", 1)]);
     expect(stats.graduated).toBe(0);
     expect(stats.nearGraduation).toBe(1);
+  });
+});
+
+describe("sectorTexture", () => {
+  it("has a texture for every sector that has an enabled company", () => {
+    // The invariant that matters: adding a company in a new sector must not
+    // silently render a blank tile on the landing page.
+    const represented = new Set(LUXURY_COMPANIES.filter((c) => c.enabled).map((c) => c.sector));
+    expect(represented.size).toBeGreaterThan(0);
+    for (const sector of represented) {
+      expect(
+        sectorTexture(sector),
+        `sector "${sector}" has companies but no texture`,
+      ).not.toBeNull();
+    }
+  });
+
+  it("returns null for a sector with no artwork", () => {
+    expect(sectorTexture("other")).toBeNull();
+  });
+
+  it("returns a path under /textures", () => {
+    expect(sectorTexture("fashion")).toMatch(/^\/textures\/.+\.webp$/);
   });
 });
