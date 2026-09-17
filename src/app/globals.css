@@ -1,26 +1,122 @@
 @import "tailwindcss";
 
+/*
+ * LuxuryPad design tokens.
+ * Restraint is the brief: ivory ground, near-black ink, one muted gold accent
+ * used sparingly, burgundy reserved for genuine emphasis. No neon, no glow,
+ * no glassmorphism.
+ */
+@theme {
+  --color-ground: #f4f0e8;
+  --color-ink: #11100f;
+  --color-card: #fcfaf6;
+  --color-gold: #b99a62;
+  --color-champagne: #d8c5a0;
+  --color-burgundy: #642b35;
+  --color-muted: #817a70;
+  --color-line: #ddd6c8;
+
+  --font-display: var(--font-serif), "Iowan Old Style", Georgia, serif;
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
+
+  --ease-lux: cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  color-scheme: light;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+html {
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--color-ground);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+}
+
+/* Editorial display type: tight, optically balanced, never shouty. */
+.display {
+  font-family: var(--font-display);
+  font-weight: 400;
+  letter-spacing: -0.02em;
+  line-height: 0.98;
+}
+
+.eyebrow {
+  font-size: 0.6875rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--color-muted);
+  font-weight: 500;
+}
+
+.rule {
+  height: 1px;
+  background: var(--color-line);
+}
+
+/* Cards lift by a hair, never bounce. */
+.lift {
+  transition:
+    transform 200ms var(--ease-lux),
+    border-color 200ms var(--ease-lux),
+    box-shadow 200ms var(--ease-lux);
+}
+.lift:hover {
+  transform: translateY(-2px);
+  border-color: color-mix(in oklab, var(--color-gold) 55%, var(--color-line));
+  box-shadow: 0 12px 28px -18px rgb(17 16 15 / 0.35);
+}
+
+/* Understated gold progress line used for graduation. */
+.progress-track {
+  height: 2px;
+  background: var(--color-line);
+  overflow: hidden;
+}
+.progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--color-champagne), var(--color-gold));
+  transition: width 400ms var(--ease-lux);
+}
+
+/* Mask reveal for hero lines. */
+@keyframes rise {
+  from {
+    transform: translateY(0.55em);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+.reveal > * {
+  animation: rise 700ms var(--ease-lux) both;
+}
+.reveal > *:nth-child(2) { animation-delay: 70ms; }
+.reveal > *:nth-child(3) { animation-delay: 140ms; }
+.reveal > *:nth-child(4) { animation-delay: 210ms; }
+
+@media (prefers-reduced-motion: reduce) {
+  .reveal > *,
+  .lift,
+  .progress-fill {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
+/* Numeric data should never reflow as it ticks. */
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+::selection {
+  background: var(--color-champagne);
+  color: var(--color-ink);
 }
