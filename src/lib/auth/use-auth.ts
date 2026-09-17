@@ -1,7 +1,16 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useAccount, useChainId, useConnect, useDisconnect, useSignMessage, useSwitchChain } from "wagmi";
+import {
+  useAccount,
+  useConfig,
+  useConnect,
+  useDisconnect,
+  useSignMessage,
+  useSwitchChain,
+  type Config,
+} from "wagmi";
+import { getConnection } from "wagmi/actions";
 import { APP_CHAIN_ID } from "@/lib/pons/deployment";
 import { SIWE_STATEMENT } from "@/lib/auth/siwe.shared";
 
@@ -21,13 +30,46 @@ export function useSession() {
 }
 
 /**
+ * Moves the wallet onto the app's chain, and proves it landed there.
+ *
+ * The re-read after the switch is not belt-and-braces: some wallets resolve
+ * `wallet_switchEthereumChain` without actually moving — they may not support
+ * the chain at all, or may keep a session pinned elsewhere. Continuing on that
+ * optimism produces a SIWE message whose `Chain ID` line the wallet then
+ * refuses to render, surfacing as an unreadable viem error. Failing here
+ * instead lets us say which network the wallet is actually on.
+ */
+async function ensureAppChain(
+  config: Config,
+  switchChainAsync: (args: { chainId: number }) => Promise<unknown>,
+) {
+  const current = () => getConnection(config).chainId;
+  if (current() === APP_CHAIN_ID) return;
+
+  try {
+    await switchChainAsync({ chainId: APP_CHAIN_ID });
+  } catch {
+    throw new Error(
+      `Your wallet could not switch to Robinhood Chain (${APP_CHAIN_ID}). Add the network in your wallet, then try again.`,
+    );
+  }
+
+  const landed = current();
+  if (landed !== APP_CHAIN_ID) {
+    throw new Error(
+      `Your wallet is still on network ${landed ?? "unknown"}. Switch it to Robinhood Chain (${APP_CHAIN_ID}) and try again.`,
+    );
+  }
+}
+
+/**
  * Connect → nonce → sign → verify. A connected wallet on its own is never
  * treated as a session; the server decides, and only after checking a
  * signature over a nonce it issued.
  */
 export function useSignIn() {
   const { address, isConnected } = useAccount();
-  const chainId = useChainId();
+  const config = useConfig();
   const { signMessageAsync } = useSignMessage();
   const { switchChainAsync } = useSwitchChain();
   const queryClient = useQueryClient();
@@ -36,9 +78,13 @@ export function useSignIn() {
     mutationFn: async () => {
       if (!isConnected || !address) throw new Error("Connect a wallet first.");
 
-      if (chainId !== APP_CHAIN_ID) {
-        await switchChainAsync({ chainId: APP_CHAIN_ID });
-      }
+      // Read the chain off the connection, not off `useChainId()`. wagmi types
+      // that hook as `config['chains'][number]['id']` — with a single
+      // configured chain it can only ever return APP_CHAIN_ID, so comparing it
+      // against APP_CHAIN_ID is a tautology and the guard never fires. The
+      // wallet would then be handed a message pinned to `Chain ID: 4663` while
+      // sitting on some other network, and refuse to display it.
+      await ensureAppChain(config, switchChainAsync);
 
       const nonceRes = await fetch("/api/auth/nonce", { cache: "no-store" });
       if (!nonceRes.ok) throw new Error("Could not start sign-in. Please try again.");

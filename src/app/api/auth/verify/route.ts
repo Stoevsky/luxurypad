@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
-import { verifySiwe } from "@/lib/auth/siwe";
+import { resolveExpectedDomains, verifySiwe } from "@/lib/auth/siwe";
 import {
   NONCE_COOKIE,
   SESSION_COOKIE,
@@ -30,15 +30,23 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const expectedDomain = new URL(
-    process.env.NEXT_PUBLIC_APP_URL ?? req.nextUrl.origin,
-  ).host;
+  const expected = resolveExpectedDomains({
+    configuredUrl: process.env.NEXT_PUBLIC_APP_URL,
+    requestOrigin: req.nextUrl.origin,
+    isProduction: process.env.NODE_ENV === "production",
+  });
+  if (!expected.ok) {
+    // A misconfigured canonical URL is our fault, not the user's, and it
+    // disables domain binding — so refuse to issue a session at all.
+    console.error(`SIWE domain binding unavailable: ${expected.reason}`);
+    return NextResponse.json({ error: "Sign-in is unavailable right now." }, { status: 500 });
+  }
 
   const result = await verifySiwe({
     message: parsed.data.message,
     signature: parsed.data.signature,
     expectedNonce,
-    expectedDomain,
+    expectedDomains: expected.domains,
   });
 
   if (!result.ok) {

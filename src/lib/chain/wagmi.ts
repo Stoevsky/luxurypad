@@ -23,7 +23,7 @@ export const wagmiConfig = createConfig({
             metadata: {
               name: "LuxuryPad",
               description: "Luxury, launched onchain.",
-              url: process.env.NEXT_PUBLIC_APP_URL ?? "https://luxurypad.app",
+              url: process.env.NEXT_PUBLIC_APP_URL ?? "https://luxurypad.family",
               icons: [],
             },
           }),

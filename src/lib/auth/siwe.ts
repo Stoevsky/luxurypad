@@ -10,8 +10,54 @@ export type VerifyInput = {
   message: string;
   signature: string;
   expectedNonce: string;
-  expectedDomain: string;
+  expectedDomains: readonly string[];
 };
+
+/**
+ * Which host(s) a login message may claim to have been issued for.
+ *
+ * Domain binding is what stops a signature farmed on another site being
+ * replayed here, so the accepted host cannot come from anything the caller
+ * controls. `Host` is a request header, and in production we refuse to trust
+ * it: the canonical URL must be configured, and only it is accepted. Failing
+ * closed is deliberate — an unset variable should break sign-in loudly rather
+ * than quietly degrade the one check that makes it worth anything.
+ *
+ * Development is the exception, and only there: the request host is also
+ * accepted so sign-in keeps working on whichever port `next dev` picked.
+ */
+export function resolveExpectedDomains(args: {
+  configuredUrl: string | undefined;
+  requestOrigin: string;
+  isProduction: boolean;
+}): { ok: true; domains: string[] } | { ok: false; reason: string } {
+  let canonical: string | null = null;
+  if (args.configuredUrl?.trim()) {
+    try {
+      canonical = new URL(args.configuredUrl.trim()).host;
+    } catch {
+      return { ok: false, reason: "NEXT_PUBLIC_APP_URL is not a valid URL." };
+    }
+  }
+
+  if (args.isProduction) {
+    return canonical
+      ? { ok: true, domains: [canonical] }
+      : { ok: false, reason: "NEXT_PUBLIC_APP_URL must be set in production." };
+  }
+
+  let requestHost: string | null = null;
+  try {
+    requestHost = new URL(args.requestOrigin).host;
+  } catch {
+    requestHost = null;
+  }
+
+  const domains = [...new Set([canonical, requestHost].filter((d): d is string => !!d))];
+  return domains.length
+    ? { ok: true, domains }
+    : { ok: false, reason: "No expected domain could be established." };
+}
 
 export type VerifyResult =
   | { ok: true; address: Address; chainId: number }
@@ -31,7 +77,7 @@ export async function verifySiwe({
   message,
   signature,
   expectedNonce,
-  expectedDomain,
+  expectedDomains,
 }: VerifyInput): Promise<VerifyResult> {
   let parsed: SiweMessage;
   try {
@@ -43,7 +89,7 @@ export async function verifySiwe({
   if (parsed.nonce !== expectedNonce) {
     return { ok: false, reason: "This login request has expired. Please try again." };
   }
-  if (parsed.domain !== expectedDomain) {
+  if (!expectedDomains.includes(parsed.domain)) {
     return { ok: false, reason: "The login message was issued for a different site." };
   }
   if (parsed.chainId !== APP_CHAIN_ID) {

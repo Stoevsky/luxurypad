@@ -1,15 +1,17 @@
 "use client";
 
 import { useState } from "react";
-import { useAccount, useChainId } from "wagmi";
+import { useAccount } from "wagmi";
 import { Button } from "@/components/ui";
 import { APP_CHAIN_ID, useSession, useSignIn, useSignOut, useWalletConnectors } from "@/lib/auth/use-auth";
 
 const short = (a: string) => `${a.slice(0, 6)}…${a.slice(-4)}`;
 
 export function ConnectWallet() {
-  const { address, isConnected } = useAccount();
-  const chainId = useChainId();
+  // `chainId` here is the connection's, not `useChainId()`'s. The latter is
+  // typed to the configured chains, so with one chain configured it always
+  // equals APP_CHAIN_ID and no network mismatch is ever detectable.
+  const { address, isConnected, chainId } = useAccount();
   const { data: session, isLoading } = useSession();
   const signIn = useSignIn();
   const signOut = useSignOut();
@@ -95,12 +97,12 @@ export function ConnectWallet() {
 
 /** Shown wherever a non-EVM or wrong-network wallet is connected. */
 export function UnsupportedNetworkNotice() {
-  const { isConnected } = useAccount();
-  const chainId = useChainId();
+  const { isConnected, chainId } = useAccount();
   if (!isConnected || chainId === APP_CHAIN_ID) return null;
   return (
     <div className="border-b border-line bg-[#642b35]/5 px-5 py-2 text-center text-[13px] text-burgundy">
-      Your wallet is connected to an unsupported network. Switch to Robinhood Chain to continue.
+      Your wallet is on network {chainId ?? "unknown"}. Switch to Robinhood Chain (
+      {APP_CHAIN_ID}) to continue.
     </div>
   );
 }
