@@ -19,7 +19,13 @@ function launch(phase: LaunchPhase, progress: number): LaunchSummary {
 
 describe("summarizeLaunches", () => {
   it("returns zeros for an empty list", () => {
-    expect(summarizeLaunches([])).toEqual({ total: 0, graduated: 0, nearGraduation: 0 });
+    expect(summarizeLaunches([])).toEqual({
+      total: 0,
+      sampled: 0,
+      partial: false,
+      graduated: 0,
+      nearGraduation: 0,
+    });
   });
 
   it("counts every launch in total", () => {
@@ -53,6 +59,31 @@ describe("summarizeLaunches", () => {
     const stats = summarizeLaunches([launch("ready_to_graduate", 1)]);
     expect(stats.graduated).toBe(0);
     expect(stats.nearGraduation).toBe(1);
+  });
+
+  it("reports the scan total, not the sample size, when a scan total is given", () => {
+    // The sample is only what hydrated successfully. On the first real run the
+    // window held 410 launches while 120 were hydrated, so publishing the
+    // sample as "Launches indexed" understated the protocol by 290 — and looked
+    // precise doing it. The scan count is exact and free, so it is the figure
+    // to publish.
+    const stats = summarizeLaunches([launch("curve", 0.1), launch("graduated", 1)], 410);
+    expect(stats.total).toBe(410);
+    expect(stats.sampled).toBe(2);
+  });
+
+  it("marks the sample as partial when hydration covered less than the window", () => {
+    expect(summarizeLaunches([launch("curve", 0.1)], 410).partial).toBe(true);
+  });
+
+  it("does not mark the sample as partial when it covered the whole window", () => {
+    expect(summarizeLaunches([launch("curve", 0.1)], 1).partial).toBe(false);
+  });
+
+  it("falls back to the sample size when no scan total is given", () => {
+    const stats = summarizeLaunches([launch("curve", 0.1), launch("curve", 0.2)]);
+    expect(stats.total).toBe(2);
+    expect(stats.partial).toBe(false);
   });
 });
 

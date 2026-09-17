@@ -47,7 +47,7 @@ export type LaunchSummary = IndexedLaunch & {
 };
 
 /** How far back a single scan reaches. The chain produces sub-second blocks. */
-const DEFAULT_WINDOW = 20_000n;
+export const DEFAULT_WINDOW = 20_000n;
 const CACHE_TTL_MS = 30_000;
 
 async function scanLaunchesUncached(window: bigint = DEFAULT_WINDOW): Promise<IndexedLaunch[]> {

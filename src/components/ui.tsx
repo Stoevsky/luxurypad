@@ -118,11 +118,21 @@ export function Unavailable({ hint }: { hint?: string }) {
   );
 }
 
-export function Stat({ label, children }: { label: string; children: ReactNode }) {
+export function Stat({
+  label,
+  children,
+  note,
+}: {
+  label: string;
+  children: ReactNode;
+  /** Qualifies the figure — e.g. the sample it was counted over. */
+  note?: string | null;
+}) {
   return (
     <div className="space-y-1">
       <p className="eyebrow">{label}</p>
       <p className="tabular text-[15px]">{children}</p>
+      {note ? <p className="text-[11px] text-muted">{note}</p> : null}
     </div>
   );
 }

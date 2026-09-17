@@ -1,11 +1,32 @@
 import Link from "next/link";
-import { Container, Eyebrow, ButtonLink, Card, Rule, Progress } from "@/components/ui";
+import { Container, Eyebrow, ButtonLink, Card, Rule } from "@/components/ui";
 import { MarketCard } from "@/components/market-card";
+import { LaunchCard } from "@/components/launch-card";
+import { StatsBand } from "@/components/stats-band";
 import { resolveLuxuryMarkets } from "@/lib/registry/resolve";
-import { listLaunches } from "@/lib/indexer/launches";
+import {
+  listLaunches,
+  scanLaunches,
+  type IndexedLaunch,
+  type LaunchSummary,
+} from "@/lib/indexer/launches";
+import { summarizeLaunches } from "@/lib/landing/stats";
+import { launchFee } from "@/lib/pons/pairs";
+import { getStockTokenRegistry } from "@/lib/registry/stock-tokens";
 import { SECTOR_LABELS, SECTOR_ORDER } from "@/lib/registry/luxury";
 
 export const revalidate = 60;
+
+/**
+ * Hydrating the whole scan window keeps every figure in the stats band over the
+ * same denominator. A bare `listLaunches(6)` would cap the count at 6 and report
+ * "6 launches" for a window holding more, which is a quiet lie.
+ *
+ * The cap bounds the fan-out: each launch costs two multicalls and the public
+ * RPC throttles. If a window ever exceeds it, every figure is computed over the
+ * same capped sample and so stays mutually consistent.
+ */
+const HYDRATION_CAP = 120;
 
 const STEPS = [
   { n: "01", title: "Choose the market", body: "Pick from supported luxury-market assets." },
@@ -15,13 +36,35 @@ const STEPS = [
 ];
 
 export default async function HomePage() {
-  const [{ markets, registryUnavailable }, launches] = await Promise.all([
+  const [{ markets, registryUnavailable }, scanned, feeWei, registry] = await Promise.all([
     resolveLuxuryMarkets(),
-    listLaunches(6).catch(() => []),
+    scanLaunches().catch(() => [] as IndexedLaunch[]),
+    launchFee().catch(() => null),
+    // Already fetched and cached by the resolve above — this costs nothing.
+    getStockTokenRegistry().catch(() => null),
   ]);
+
+  // scanLaunches is singleFlight-cached, so listLaunches reuses that same
+  // eth_getLogs rather than issuing a second one.
+  const launches = scanned.length
+    ? await listLaunches(Math.min(scanned.length, HYDRATION_CAP)).catch(() => [] as LaunchSummary[])
+    : [];
 
   const launchable = markets.filter((m) => m.launchable);
   const featured = markets.slice(0, 6);
+  // An empty result means the scan failed, not that the protocol is empty.
+  // scanned.length is the exact window count; launches.length is only what
+  // hydrated, so the two are passed separately rather than conflated.
+  const stats = launches.length > 0 ? summarizeLaunches(launches, scanned.length) : null;
+
+  // The same two lookups the Explore page builds, so a launch card carries the
+  // identical pairing language and unit symbol on both pages.
+  const marketByAddress = new Map(
+    markets.filter((m) => m.asset).map((m) => [m.asset!.address.toLowerCase(), m]),
+  );
+  const symbolByAddress = new Map(
+    (registry ?? []).map((a) => [a.address.toLowerCase(), a.symbol]),
+  );
 
   return (
     <>
@@ -86,6 +129,8 @@ export default async function HomePage() {
         </Container>
       </section>
 
+      <StatsBand stats={stats} launchFeeWei={feeWei} />
+
       {/* ——— Markets ——— */}
       <section className="border-b border-line">
         <Container className="py-16 sm:py-20">
@@ -143,21 +188,13 @@ export default async function HomePage() {
             </Card>
           ) : (
             <div className="mt-9 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {launches.map((l) => (
-                <Link key={l.token} href={`/token/${l.token}`} className="block">
-                  <Card interactive className="flex h-full flex-col gap-4 p-5">
-                    <div className="flex items-baseline justify-between gap-3">
-                      <p className="display truncate text-[19px]">{l.name}</p>
-                      <p className="tabular shrink-0 text-[12px] text-muted">${l.symbol}</p>
-                    </div>
-                    <div className="mt-auto space-y-2">
-                      <Progress
-                        value={l.progress}
-                        label={`${Math.round(l.progress * 100)}% to graduation`}
-                      />
-                    </div>
-                  </Card>
-                </Link>
+              {launches.slice(0, 6).map((l) => (
+                <LaunchCard
+                  key={l.token}
+                  launch={l}
+                  market={marketByAddress.get(l.quoteAsset.toLowerCase())}
+                  quoteSymbol={symbolByAddress.get(l.quoteAsset.toLowerCase())}
+                />
               ))}
             </div>
           )}
