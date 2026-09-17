@@ -1,10 +1,9 @@
 import type { Metadata } from "next";
-import Link from "next/link";
-import { Container, Eyebrow, Card, Progress, StatePill } from "@/components/ui";
+import { Container, Eyebrow, Card } from "@/components/ui";
+import { LaunchCard } from "@/components/launch-card";
 import { listLaunches, sectionOf, type LaunchSummary } from "@/lib/indexer/launches";
-import { resolveLuxuryMarkets, pairingLabel, type LuxuryMarket } from "@/lib/registry/resolve";
+import { resolveLuxuryMarkets } from "@/lib/registry/resolve";
 import { getStockTokenRegistry } from "@/lib/registry/stock-tokens";
-import { formatQuoteAmount, relativeAge } from "@/lib/format";
 
 export const revalidate = 30;
 
@@ -81,56 +80,5 @@ export default async function ExplorePage() {
         })
       )}
     </Container>
-  );
-}
-
-function LaunchCard({
-  launch,
-  market,
-  quoteSymbol: registrySymbol,
-}: {
-  launch: LaunchSummary;
-  market?: LuxuryMarket;
-  quoteSymbol?: string;
-}) {
-  const isNativeQuote = launch.quoteAsset === "0x0000000000000000000000000000000000000000";
-  // Name the unit whenever it is known. An unlabelled "13.993" reads as ETH to
-  // anyone skimming, which is exactly the wrong thing for a Stock Token pair.
-  const quoteSymbol = isNativeQuote ? "ETH" : market?.asset?.symbol ?? registrySymbol ?? "";
-  return (
-    <Link href={`/token/${launch.token}`} className="block">
-      <Card interactive className="flex h-full flex-col gap-4 p-5">
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <p className="display truncate text-[19px] leading-tight">{launch.name}</p>
-            <p className="tabular text-[11px] uppercase tracking-[0.12em] text-muted">
-              ${launch.symbol}
-            </p>
-          </div>
-          {market ? <StatePill state={market.state} /> : null}
-        </div>
-
-        <dl className="grid grid-cols-2 gap-3 text-[12px]">
-          <div>
-            <dt className="eyebrow">Taken in</dt>
-            <dd className="tabular">{formatQuoteAmount(launch.realQuoteReserve, quoteSymbol)}</dd>
-          </div>
-          <div>
-            <dt className="eyebrow">Creator tax</dt>
-            <dd className="tabular">{(launch.creatorTaxBps / 100).toFixed(2)}%</dd>
-          </div>
-        </dl>
-
-        <div className="mt-auto space-y-3">
-          <Progress value={launch.progress} label={`${Math.round(launch.progress * 100)}% to graduation`} />
-          <p className="text-[11px] text-muted">
-            {/* Pairing language is guarded: only a verified market may say "Paired with". */}
-            {pairingLabel(market, { isNativeQuote })}
-            {" · "}
-            {relativeAge(launch.launchedAt)}
-          </p>
-        </div>
-      </Card>
-    </Link>
   );
 }
