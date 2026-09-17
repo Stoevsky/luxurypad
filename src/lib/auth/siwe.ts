@@ -1,5 +1,5 @@
 import { SiweMessage, generateNonce } from "siwe";
-import { createPublicClient, http, type Address } from "viem";
+import { createPublicClient, http, recoverMessageAddress, type Address } from "viem";
 import { appChain } from "@/lib/chain/robinhood";
 import { APP_CHAIN_ID } from "@/lib/pons/deployment";
 import { SIWE_STATEMENT } from "./siwe.shared";
@@ -102,19 +102,46 @@ export async function verifySiwe({
     return { ok: false, reason: "This login request is not valid yet." };
   }
 
+  const claimed = parsed.address as Address;
+
+  // Fast path: a plain EOA signature is pure secp256k1 recovery and needs no
+  // chain at all. viem's `publicClient.verifyMessage` always goes through the
+  // ERC-6492 universal validator, which costs an `eth_call` — so on the public
+  // RPC a perfectly good signature from an ordinary wallet gets rejected
+  // whenever the node is busy. Recover locally first; the chain is only
+  // consulted for signatures that recovery cannot explain.
+  try {
+    const recovered = await recoverMessageAddress({
+      message,
+      signature: signature as `0x${string}`,
+    });
+    if (recovered.toLowerCase() === claimed.toLowerCase()) {
+      return { ok: true, address: claimed, chainId: parsed.chainId };
+    }
+  } catch {
+    // Not a recoverable 65-byte signature — a smart-contract wallet. Fall
+    // through to the on-chain check below.
+  }
+
+  // Smart-contract wallets (EIP-1271, and ERC-6492 for ones not yet deployed)
+  // can only be verified by asking the chain.
   try {
     const client = createPublicClient({ chain: appChain, transport: http() });
     const valid = await client.verifyMessage({
-      address: parsed.address as Address,
+      address: claimed,
       message,
       signature: signature as `0x${string}`,
     });
     if (!valid) return { ok: false, reason: "That signature could not be verified." };
   } catch {
-    return { ok: false, reason: "We couldn't verify your signature right now. Please try again." };
+    return {
+      ok: false,
+      reason:
+        "We couldn't reach Robinhood Chain to check your smart-wallet signature. Please try again.",
+    };
   }
 
-  return { ok: true, address: parsed.address as Address, chainId: parsed.chainId };
+  return { ok: true, address: claimed, chainId: parsed.chainId };
 }
 
 /** The exact statement users are asked to sign. Never mentions secrets. */

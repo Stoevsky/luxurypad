@@ -114,7 +114,10 @@ export function useSignIn() {
       });
       if (!verifyRes.ok) {
         const { error } = (await verifyRes.json().catch(() => ({ error: null }))) as { error?: string };
-        throw new Error(error ?? "We couldn't verify your signature.");
+        // Include the status when the body carried no reason of its own —
+        // otherwise a 500 with an HTML body is indistinguishable from a
+        // genuine signature rejection, which is what made this hard to debug.
+        throw new Error(error ?? `Sign-in failed (HTTP ${verifyRes.status}).`);
       }
       return (await verifyRes.json()) as { address: `0x${string}`; chainId: number };
     },
