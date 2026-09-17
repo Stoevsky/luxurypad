@@ -9,6 +9,7 @@ import { useSession } from "@/lib/auth/use-auth";
 import type { LuxuryMarket } from "@/lib/registry/resolve";
 import { SECTOR_LABELS, type LuxurySector } from "@/lib/registry/luxury";
 import { explorerTx } from "@/lib/chain/robinhood";
+import { APP_CHAIN_ID } from "@/lib/pons/deployment";
 
 type PreflightCheck = { id: string; label: string; status: "pass" | "fail" | "warn"; detail: string };
 type Preflight = {
@@ -32,6 +33,9 @@ export function sectorFilters(
 ): Array<{ id: "all" | LuxurySector; label: string; count: number }> {
   const counts = new Map<LuxurySector, number>();
   for (const m of launchable) {
+    // "other" is not a browsable luxury sector — it is where native ETH lands,
+    // and a tab reading "Other" would say nothing useful. It stays under All.
+    if (m.company.sector === "other") continue;
     counts.set(m.company.sector, (counts.get(m.company.sector) ?? 0) + 1);
   }
   const sectors = [...counts.entries()]
@@ -42,6 +46,44 @@ export function sectorFilters(
 }
 
 const STEPS = ["Market", "Create", "Economics", "Review"] as const;
+
+/**
+ * Native ETH as a selectable pair.
+ *
+ * Pons accepts the zero address as a quote asset and `launch.ts` already treats
+ * it specially: the initial buy rides along in the transaction's `value`, so
+ * there is no ERC-20 balance to hold and no allowance to approve first. That
+ * path was reachable by the server but had no way in from the UI, which left
+ * ETH-funded launches blocked behind an approval they never actually needed.
+ *
+ * It is not a luxury house, so it carries no sector and is pinned to the front
+ * of the list rather than filed under one.
+ */
+export const NATIVE_MARKET: LuxuryMarket = {
+  company: {
+    id: "native-eth",
+    companyName: "Ether",
+    sector: "other",
+    country: "—",
+    note: "Launch paired against native ETH on Robinhood Chain. No approval step.",
+    enabled: true,
+  },
+  state: "PAIR_AVAILABLE",
+  asset: {
+    assetId: "native:eth",
+    symbol: "ETH",
+    name: "Ether",
+    address: zeroAddress,
+    chainId: APP_CHAIN_ID,
+    decimals: 18,
+    currentMultiplier: "1",
+    pendingMultiplier: "",
+  },
+  assetSource: null,
+  quote: null,
+  launchable: true,
+  degraded: false,
+};
 
 export function LaunchWizard({
   markets,
@@ -55,7 +97,12 @@ export function LaunchWizard({
   const { data: session } = useSession();
   const { address, isConnected } = useAccount();
 
-  const launchable = useMemo(() => markets.filter((m) => m.launchable), [markets]);
+  // ETH leads: it is the only pair that needs no approval, so it is the fastest
+  // route to a launch even when the registry is degraded.
+  const launchable = useMemo(
+    () => [NATIVE_MARKET, ...markets.filter((m) => m.launchable)],
+    [markets],
+  );
   const filters = useMemo(() => sectorFilters(launchable), [launchable]);
   const [step, setStep] = useState(0);
   const [filter, setFilter] = useState<"all" | LuxurySector>("all");

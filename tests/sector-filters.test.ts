@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { sectorFilters } from "@/components/launch-wizard";
+import { zeroAddress } from "viem";
+import { NATIVE_MARKET, sectorFilters } from "@/components/launch-wizard";
 import type { LuxurySector } from "@/lib/registry/luxury";
 
 /**
@@ -54,5 +55,31 @@ describe("sectorFilters", () => {
 
   it("leaves only All when the chain check verified nothing", () => {
     expect(sectorFilters([])).toEqual([{ id: "all", label: "All", count: 0 }]);
+  });
+
+  it("gives native ETH no sector tab of its own", () => {
+    const filters = sectorFilters([NATIVE_MARKET, market("automotive")]);
+    expect(filters.map((f) => f.id)).toEqual(["all", "automotive"]);
+    // It is still selectable — it just lives under All.
+    expect(filters[0].count).toBe(2);
+  });
+});
+
+describe("NATIVE_MARKET", () => {
+  it("quotes against the zero address so no ERC-20 approval is needed", () => {
+    // launch.ts skips both the balance and allowance checks for a native quote
+    // and folds the initial buy into the transaction value instead.
+    expect(NATIVE_MARKET.asset?.address).toBe(zeroAddress);
+    expect(NATIVE_MARKET.asset?.decimals).toBe(18);
+  });
+
+  it("is launchable, because Pons always accepts native ETH as a pair", () => {
+    expect(NATIVE_MARKET.launchable).toBe(true);
+    expect(NATIVE_MARKET.state).toBe("PAIR_AVAILABLE");
+  });
+
+  it("is not presented as a tokenised equity", () => {
+    expect(NATIVE_MARKET.assetSource).toBeNull();
+    expect(NATIVE_MARKET.quote).toBeNull();
   });
 });
