@@ -406,38 +406,50 @@ const TEXTURES = [
           band(0.11, 150, weave(u, v, 150)) +
           band(0.07, 30, fbm(p, u * 26, v * 26, 3));
 
-        // A single torn ribbon of leaf, laid on the diagonal so it cuts across
-        // the folds instead of lying along them.
+        // Broad torn sheets of leaf, not a ribbon.
         //
-        // The edge is a band with a flat core, not a peak: `1 - smoothstep` from
-        // zero gave the ribbon no interior at all, just two soft shoulders that
-        // met in the middle, and at hero resolution that blurred into a stain.
-        const seam = u * 0.82 + v * 0.58 - 0.74 + 0.06 * fbm(q, u * 2.6, v * 3.4, 4);
-        const ribbon = 1 - smoothstep(0.055, 0.135, Math.abs(seam));
-        // Erosion only nibbles the ribbon now. At 0.24..0.62 it ate through the
-        // middle and left disconnected blobs strung along the diagonal.
-        const tear = smoothstep(0.1, 0.44, 0.5 + 0.5 * fbm(q, u * 5 + 21, v * 6 + 5, 4));
-        const leaf = clamp01(ribbon * tear);
-        // Facet scale matched to `materials`, which is the one that reads as
-        // metal. At frequency 26 the facets were finer than the ribbon is wide,
-        // so no single facet could catch the light — the flashes averaged out
-        // into grey-brown noise instead of glinting.
+        // Two earlier versions drew the leaf as a narrow diagonal seam, and both
+        // failed the same way: a thin band on a near-flat field reads as an
+        // OBJECT lying on a wall — a rope, a smear — rather than as one of two
+        // materials the image is made of. Widening the band and re-tuning its
+        // facets did not fix it, because the fault was the composition.
+        //
+        // `materials` is the texture that does read as gold leaf, and the reason
+        // is that its leaf mask is a large organic region covering much of the
+        // frame, so the eye reads a torn SURFACE. This uses the same
+        // construction: a broad mask with progressively finer noise added, so
+        // the tear is ragged at every scale.
+        const broad = fbm(q, u * 1.8, v * 2.1, 3);
+        const mid = fbm(q, u * 6.2 + 3, v * 7 + 7, 3);
+        const fineEdge = fbm(q, u * 18 + 11, v * 20 + 2, 2);
+        // The bias keeps the editorial diagonal — leaf gathers toward the lower
+        // left and thins toward the upper right — without the shape ever
+        // becoming a stripe.
+        const bias = 0.3 * (u * 0.7 + v * -0.72);
+        const leaf = smoothstep(-0.3, 0.02, broad + 0.36 * mid + 0.14 * fineEdge + bias);
+
+        // Facet scale matched to `materials`. At the frequencies used before,
+        // facets were finer than the leaf was wide, so no single facet could
+        // hold the light: the flashes averaged into grey-brown noise under
+        // downscale instead of glinting.
         const crinkle =
-          leaf *
-          (band(1.15, 11, ridged(q, u * 7, v * 7, 2) - 0.5) +
-            band(0.5, 30, ridged(q, u * 21, v * 21, 3) - 0.5) +
-            band(0.14, 110, fbm(q, u * 90, v * 90, 2)));
+          band(1.15, 11, ridged(q, u * 7, v * 7, 2) - 0.5) +
+          band(0.5, 30, ridged(q, u * 21, v * 21, 3) - 0.5) +
+          band(0.14, 110, fbm(q, u * 90, v * 90, 2));
 
         const t = 0.02 + 0.03 * (0.5 + 0.5 * fbm(q, u * 4, v * 4, 3));
         const sheen = clamp01(0.5 + 0.5 * fbm(p, u * 1.3 + 30, v * 1.3, 3)) * 0.2;
         return {
-          h: silk + crinkle,
+          // The silk keeps showing through the leaf rather than being replaced,
+          // so the drape reads as continuous under both materials.
+          h: lerp(silk, crinkle + 0.4 * silk, leaf),
           t: clamp01(t),
           g: clamp01(leaf * 0.95 + sheen * (1 - leaf)),
-          // 0.36 was too dark to be gold. Metal wants a dim diffuse, but dim
-          // enough and the pigment stops reading as a metal and starts reading
-          // as dirt — which is exactly what it looked like.
-          d: lerp(1, 0.62, leaf),
+          // This image is displayed at roughly half the resolution it is
+          // rendered at, and downscaling averages the facets together. A
+          // physically-dim metal diffuse survives that average as olive, so the
+          // target here is the AVERAGE reading as gold, not the peak.
+          d: lerp(1, 0.72, leaf),
           s: lerp(0.12, 1, leaf),
         };
       },
