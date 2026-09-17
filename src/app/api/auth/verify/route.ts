@@ -55,11 +55,26 @@ export async function POST(req: NextRequest) {
     return res;
   }
 
-  const token = await createSessionToken({
-    address: result.address,
-    chainId: result.chainId,
-    issuedAt: Math.floor(Date.now() / 1000),
-  });
+  // Signing needs SESSION_SECRET. When it is missing or too short this is the
+  // only step in the route that throws, and an uncaught throw here becomes an
+  // HTML 500 — which the browser cannot read as JSON, so the user is told
+  // nothing useful about a purely server-side misconfiguration.
+  let token: string;
+  try {
+    token = await createSessionToken({
+      address: result.address,
+      chainId: result.chainId,
+      issuedAt: Math.floor(Date.now() / 1000),
+    });
+  } catch (e) {
+    console.error("SIWE session signing failed:", e instanceof Error ? e.message : e);
+    const res = NextResponse.json(
+      { error: "Sign-in is misconfigured on the server. SESSION_SECRET is not set." },
+      { status: 500 },
+    );
+    res.cookies.delete(NONCE_COOKIE);
+    return res;
+  }
 
   const res = NextResponse.json({
     address: result.address,
