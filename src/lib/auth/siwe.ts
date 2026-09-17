@@ -1,6 +1,7 @@
 import { SiweMessage, generateNonce } from "siwe";
 import { createPublicClient, http, type Address } from "viem";
-import { robinhoodChain, ROBINHOOD_CHAIN_ID } from "@/lib/chain/robinhood";
+import { appChain } from "@/lib/chain/robinhood";
+import { APP_CHAIN_ID } from "@/lib/pons/deployment";
 import { SIWE_STATEMENT } from "./siwe.shared";
 
 export { generateNonce };
@@ -45,7 +46,7 @@ export async function verifySiwe({
   if (parsed.domain !== expectedDomain) {
     return { ok: false, reason: "The login message was issued for a different site." };
   }
-  if (parsed.chainId !== ROBINHOOD_CHAIN_ID) {
+  if (parsed.chainId !== APP_CHAIN_ID) {
     return { ok: false, reason: "Switch your wallet to Robinhood Chain to sign in." };
   }
   if (parsed.expirationTime && new Date(parsed.expirationTime).getTime() < Date.now()) {
@@ -56,7 +57,7 @@ export async function verifySiwe({
   }
 
   try {
-    const client = createPublicClient({ chain: robinhoodChain, transport: http() });
+    const client = createPublicClient({ chain: appChain, transport: http() });
     const valid = await client.verifyMessage({
       address: parsed.address as Address,
       message,
@@ -86,7 +87,7 @@ export function buildSiweMessage(params: {
     statement: SIWE_STATEMENT,
     uri: params.uri,
     version: "1",
-    chainId: ROBINHOOD_CHAIN_ID,
+    chainId: APP_CHAIN_ID,
     nonce: params.nonce,
     issuedAt: now.toISOString(),
     expirationTime: new Date(now.getTime() + 5 * 60_000).toISOString(),

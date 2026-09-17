@@ -1,8 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { zeroAddress, type Address } from "viem";
 import { preflightLaunch, encodeLaunch, launchSalt, launchValue } from "@/lib/pons/launch";
+import { launchFee } from "@/lib/pons/pairs";
 import { getStockTokenBySymbol } from "@/lib/registry/stock-tokens";
-import { PONS_V2 } from "@/lib/pons/contracts";
+import { requireDeployment } from "@/lib/pons/deployment";
+
+const PONS_V2 = requireDeployment();
 
 /**
  * A real, funded Robinhood Chain address. Preflight checks the creator's actual
@@ -62,13 +65,18 @@ describe("launch preflight", () => {
     const salt = launchSalt(CREATOR, "X");
     expect(encodeLaunch(draft(), salt).to.toLowerCase()).toBe(PONS_V2.launchFactory.toLowerCase());
     expect(encodeLaunch(draft({ initialBuy: 10n ** 17n }), salt).to.toLowerCase()).toBe(
-      PONS_V2.launchAndBuy.toLowerCase(),
+      PONS_V2.launchAndBuy!.toLowerCase(),
     );
   });
 
   it("carries the launch fee plus a native first buy in tx value", () => {
-    const fee = launchValue(draft());
-    expect(launchValue(draft({ initialBuy: 10n ** 18n }))).toBe(fee + 10n ** 18n);
+    const fee = 5n * 10n ** 14n;
+    expect(launchValue(draft(), fee)).toBe(fee);
+    expect(launchValue(draft({ initialBuy: 10n ** 18n }), fee)).toBe(fee + 10n ** 18n);
+  });
+
+  it("reads the launch fee from the factory rather than assuming it", async () => {
+    expect(await launchFee()).toBe(5n * 10n ** 14n);
   });
 
   it("never returns a transaction when a blocking check failed", async () => {

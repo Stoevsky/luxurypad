@@ -14,7 +14,25 @@ import type { Address } from "viem";
  * `protocolVersion` so historical launches keep resolving against the contracts
  * they were actually created with (see `launch_protocol_deployments`).
  */
-export const PONS_V2 = {
+export type PonsDeployment = {
+  protocolVersion: string;
+  chainId: number;
+  launchFactory: Address;
+  /** Null when no launch-and-buy router is known; initial buys are then refused. */
+  launchAndBuy: Address | null;
+  memeHook?: Address;
+  launchLocker?: Address;
+  graduationExecutor?: Address;
+  uniswapV4PoolManager?: Address;
+  /**
+   * `verified-onchain` means the addresses were confirmed against the live
+   * chain from this repo. `configured` means they were supplied by the operator
+   * and carry only that assurance.
+   */
+  provenance: "verified-onchain" | "configured";
+};
+
+export const PONS_V2_MAINNET: PonsDeployment = {
   protocolVersion: "pons-v2",
   chainId: 4663,
   /** Emits TokenLaunched / LaunchSwept / PoolGraduated. */
@@ -27,7 +45,8 @@ export const PONS_V2 = {
   launchLocker: "0x267444d099b10fb5ed7c3cc7b7c767adca574952" as Address,
   graduationExecutor: "0xc7819b64a1daecd7ec19856d026cb14efbd89046" as Address,
   uniswapV4PoolManager: "0x8366a39cc670b4001a1121b8f6a443a643e40951" as Address,
-} as const;
+  provenance: "verified-onchain",
+};
 
 /** Native ETH is represented as the zero address in Pons quote-asset fields. */
 export const NATIVE_QUOTE = "0x0000000000000000000000000000000000000000" as Address;

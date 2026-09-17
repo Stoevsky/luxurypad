@@ -2,7 +2,8 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { Container, Eyebrow, Card, Progress, StatePill } from "@/components/ui";
 import { listLaunches, sectionOf, type LaunchSummary } from "@/lib/indexer/launches";
-import { resolveLuxuryMarkets } from "@/lib/registry/resolve";
+import { resolveLuxuryMarkets, pairingLabel, type LuxuryMarket } from "@/lib/registry/resolve";
+import { getStockTokenRegistry } from "@/lib/registry/stock-tokens";
 import { formatQuoteAmount, relativeAge } from "@/lib/format";
 
 export const revalidate = 30;
@@ -20,14 +21,23 @@ const SECTIONS = [
 ] as const;
 
 export default async function ExplorePage() {
-  const [launches, { markets }] = await Promise.all([
+  const [launches, { markets }, registry] = await Promise.all([
     listLaunches(48).catch(() => [] as LaunchSummary[]),
     resolveLuxuryMarkets().catch(() => ({ markets: [] as never[] })),
+    // Already fetched and cached by the resolve above — this costs nothing.
+    getStockTokenRegistry().catch(() => null),
   ]);
 
   // Map a launch's quote asset back to a luxury market, when there is one.
   const byAddress = new Map(
     markets.filter((m) => m.asset).map((m) => [m.asset!.address.toLowerCase(), m]),
+  );
+
+  // Launches can be quoted in any approved pair, including Stock Tokens outside
+  // the curated luxury list. Naming the unit is not the same as claiming a
+  // luxury pairing, so this map is only ever used for the amount's suffix.
+  const symbolByAddress = new Map(
+    (registry ?? []).map((a) => [a.address.toLowerCase(), a.symbol]),
   );
 
   return (
@@ -58,7 +68,12 @@ export default async function ExplorePage() {
               </div>
               <div className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                 {items.map((l) => (
-                  <LaunchCard key={l.token} launch={l} market={byAddress.get(l.quoteAsset.toLowerCase())} />
+                  <LaunchCard
+                    key={l.token}
+                    launch={l}
+                    market={byAddress.get(l.quoteAsset.toLowerCase())}
+                    quoteSymbol={symbolByAddress.get(l.quoteAsset.toLowerCase())}
+                  />
                 ))}
               </div>
             </section>
@@ -72,11 +87,16 @@ export default async function ExplorePage() {
 function LaunchCard({
   launch,
   market,
+  quoteSymbol: registrySymbol,
 }: {
   launch: LaunchSummary;
-  market?: { company: { companyName: string }; state: "PAIR_AVAILABLE" | "DISCOVERY_ONLY" | "THEME_ONLY" };
+  market?: LuxuryMarket;
+  quoteSymbol?: string;
 }) {
   const isNativeQuote = launch.quoteAsset === "0x0000000000000000000000000000000000000000";
+  // Name the unit whenever it is known. An unlabelled "13.993" reads as ETH to
+  // anyone skimming, which is exactly the wrong thing for a Stock Token pair.
+  const quoteSymbol = isNativeQuote ? "ETH" : market?.asset?.symbol ?? registrySymbol ?? "";
   return (
     <Link href={`/token/${launch.token}`} className="block">
       <Card interactive className="flex h-full flex-col gap-4 p-5">
@@ -93,7 +113,7 @@ function LaunchCard({
         <dl className="grid grid-cols-2 gap-3 text-[12px]">
           <div>
             <dt className="eyebrow">Taken in</dt>
-            <dd className="tabular">{formatQuoteAmount(launch.realQuoteReserve, isNativeQuote ? "ETH" : "")}</dd>
+            <dd className="tabular">{formatQuoteAmount(launch.realQuoteReserve, quoteSymbol)}</dd>
           </div>
           <div>
             <dt className="eyebrow">Creator tax</dt>
@@ -105,11 +125,7 @@ function LaunchCard({
           <Progress value={launch.progress} label={`${Math.round(launch.progress * 100)}% to graduation`} />
           <p className="text-[11px] text-muted">
             {/* Pairing language is guarded: only a verified market may say "Paired with". */}
-            {isNativeQuote
-              ? "Paired with ETH"
-              : market?.state === "PAIR_AVAILABLE"
-                ? `Paired with ${market.company.companyName} Stock Token`
-                : "Paired with a Stock Token"}
+            {pairingLabel(market, { isNativeQuote })}
             {" · "}
             {relativeAge(launch.launchedAt)}
           </p>

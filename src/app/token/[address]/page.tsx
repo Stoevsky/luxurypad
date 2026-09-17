@@ -5,7 +5,7 @@ import { isAddress, type Address } from "viem";
 import { Container, Eyebrow, Card, Rule, Progress, Stat, StatePill } from "@/components/ui";
 import { findLaunchByToken } from "@/lib/indexer/launches";
 import { readCurveState, readTokenMeta, graduationProgress, phaseOf } from "@/lib/pons/curve";
-import { resolveLuxuryMarkets } from "@/lib/registry/resolve";
+import { resolveLuxuryMarkets, pairingLabel } from "@/lib/registry/resolve";
 import { explorerAddress, explorerTx } from "@/lib/chain/robinhood";
 import { formatAmount, formatQuoteAmount, relativeAge, shortAddress } from "@/lib/format";
 import { TradePanel } from "@/components/trade-panel";
@@ -51,11 +51,10 @@ export default async function TokenPage({ params }: Props) {
   const quoteSymbol = state.isNativeQuote ? "ETH" : market?.asset?.symbol ?? "";
 
   // Pairing language is verified, not assumed.
-  const pairing = state.isNativeQuote
-    ? "Paired with ETH"
-    : market?.state === "PAIR_AVAILABLE"
-      ? `Paired with ${market.company.companyName} Stock Token`
-      : `Paired with ${quoteSymbol || "a Stock Token"}`;
+  const pairing = pairingLabel(market, {
+    isNativeQuote: state.isNativeQuote,
+    fallbackSymbol: quoteSymbol,
+  });
 
   return (
     <Container className="py-14 sm:py-20">

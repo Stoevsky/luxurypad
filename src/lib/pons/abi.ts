@@ -30,6 +30,18 @@ export const ponsLaunchAbi = parseAbi([
 ]);
 
 /**
+ * Factory views. Confirmed live against 0x7ed5…ec7e on chain 4663:
+ * `launchFee()` -> 5e14 wei, `launchEnabled()` -> true, and
+ * `approvedPairTokens()` agreeing exactly with the launch simulation across
+ * GLD/SLV/TSLA/RIVN/LULU (true) and ELF/CCL (false).
+ */
+export const ponsFactoryViewsAbi = parseAbi([
+  "function launchFee() view returns (uint256)",
+  "function launchEnabled() view returns (bool)",
+  "function approvedPairTokens(address token) view returns (bool)",
+]);
+
+/**
  * Factory events.
  * TokenLaunched topic0 0x8d4aad4953d0ca700d468f3753aa14432d1b35b43ec6409f051fb6aa43a89607
  * confirmed by log scan; topic order (token, curve, deployer) confirmed by

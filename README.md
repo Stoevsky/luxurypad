@@ -2,12 +2,13 @@
 
 **Luxury, launched onchain.**
 
-A launch and discovery interface for **Pons V2** on **Robinhood Chain** (chain id `4663`),
-built around luxury-market narratives.
+A launch and discovery interface for **Pons V2**, built around luxury-market narratives. It
+defaults to the verified deployment on **Robinhood Chain** (chain id `4663`) and can be pointed at
+another Pons deployment through the environment.
 
 ---
 
-## Read this first: the luxury premise does not hold as specified
+## Read this first: the luxury premise does not hold on Robinhood mainnet
 
 The brief asks for a launchpad where users launch tokens paired with Ferrari, LVMH, Hermès,
 Kering, Richemont, Moncler, Porsche and Burberry Stock Tokens.
@@ -37,9 +38,30 @@ As resolved against live data:
 - **Theme (11):** Burberry, Estée Lauder, Ferrari, Hermès, Kering, LVMH, Moncler, Porsche, Prada,
   Richemont, Swatch Group
 
-**The honest summary: this is a thin luxury catalog.** Five launchable pairs, of which two are
-precious-metals ETFs and two are premium EV makers. If the product needs a real luxury story, the
-constraint is upstream asset coverage, not this codebase.
+**The honest summary: on Robinhood mainnet this is a thin luxury catalog.** Five launchable pairs,
+of which two are precious-metals ETFs and two are premium EV makers. The constraint is upstream
+asset coverage, not this codebase.
+
+### The supported way out: bring your own pair assets
+
+Because the constraint is asset coverage, the codebase takes pair assets from two sources instead
+of one. Map a company id to a token address in `src/lib/registry/luxury-pairs.ts`:
+
+```ts
+export const LUXURY_PAIR_ASSETS: Record<number, Partial<Record<string, Address>>> = {
+  4663: { ferrari: "0x…", lvmh: "0x…" },
+};
+```
+
+A configured pair token **wins over** a Robinhood ticker for that company, and turns a Theme-only
+house into a real launchable market. The honesty guarantees are unchanged and still enforced:
+
+- The address must answer `name`/`symbol`/`decimals` on chain, or it resolves to `null` and the
+  company stays Theme-only. A token that doesn't respond is never invented into existence.
+- It must pass the same factory `approvedPairTokens()` check as any other pair. Configuring an
+  address does not make it launchable — the factory does.
+- Copy adapts: such a market reads "Paired with `SYMBOL`", never "Paired with *X* Stock Token",
+  because a token deployed for this launchpad is a pair asset but **not** a tokenised equity.
 
 ---
 
@@ -55,8 +77,15 @@ Every integration fact below was derived from two independent sources that agree
 3. **Byte-for-byte decoding.** Real mainnet `launchToken` / `launchAndBuy` calldata decodes cleanly
    against the resulting types, including every tuple offset and trailing word.
 
-Contracts are pinned in `src/lib/pons/contracts.ts`, **not** in environment variables: they are
-consensus-critical, and a wrong value silently sends funds to the wrong contract.
+The verified mainnet deployment is pinned in `src/lib/pons/contracts.ts` and is the default. To
+point this instance at a different Pons deployment, set `NEXT_PUBLIC_PONS_FACTORY` (and optionally
+`NEXT_PUBLIC_PONS_ROUTER`, without which an initial buy cannot be bundled) alongside
+`NEXT_PUBLIC_CHAIN_ID` and `RPC_URL`.
+
+These values are consensus-critical — a wrong one silently sends funds to the wrong contract — so a
+configured deployment is marked `provenance: "configured"` rather than `"verified-onchain"`, and
+every launch preflight independently re-checks chain id, factory bytecode, `launchEnabled()`, the
+pair allowlist and the launch fee against that deployment before a signature is ever requested.
 
 ### Two protocol errors that shape the product
 

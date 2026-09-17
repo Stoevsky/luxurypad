@@ -3,7 +3,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { notFound } from "next/navigation";
 import { Container, Eyebrow, Card, ButtonLink, StatePill, Stat, Unavailable, Rule, Progress } from "@/components/ui";
-import { resolveLuxuryMarkets, relationshipLabel } from "@/lib/registry/resolve";
+import { resolveLuxuryMarkets, relationshipLabel, assetKindLabel } from "@/lib/registry/resolve";
 import { SECTOR_LABELS } from "@/lib/registry/luxury";
 import { listLaunches } from "@/lib/indexer/launches";
 import { explorerAddress } from "@/lib/chain/robinhood";
@@ -84,7 +84,7 @@ export default async function MarketPage({ params }: Props) {
 
       <div className="mt-10 grid gap-4 lg:grid-cols-[1.4fr_1fr]">
         <Card className="p-6">
-          <p className="eyebrow">Stock Token</p>
+          <p className="eyebrow">{assetKindLabel(market)}</p>
           <Rule className="my-4" />
           <dl className="grid gap-5 sm:grid-cols-2">
             <Stat label="Reference price">

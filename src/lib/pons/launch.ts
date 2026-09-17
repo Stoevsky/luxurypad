@@ -7,9 +7,10 @@ import {
   type Hex,
 } from "viem";
 import { ponsLaunchAbi, erc20Abi } from "./abi";
-import { PONS_V2 } from "./contracts";
+import type { PonsDeployment } from "./contracts";
+import { ACTIVE_DEPLOYMENT, launchUnavailableReason, requireDeployment } from "./deployment";
 import { rpc } from "./client";
-import { OBSERVED_LAUNCH_FEE_WEI, OPEN_ECONOMICS_COMMITMENT, verifyPairApproved } from "./pairs";
+import { OPEN_ECONOMICS_COMMITMENT, launchEnabled, launchFee, verifyPairApproved } from "./pairs";
 import { isNative } from "./curve";
 
 export type LaunchDraft = {
@@ -81,13 +82,24 @@ function buildParams(draft: LaunchDraft, salt: Hex) {
   } as const;
 }
 
-export function encodeLaunch(draft: LaunchDraft, salt: Hex) {
+export function encodeLaunch(
+  draft: LaunchDraft,
+  salt: Hex,
+  deployment: PonsDeployment = requireDeployment(),
+) {
   const params = buildParams(draft, salt);
   const useRouter = draft.initialBuy > 0n;
 
   if (useRouter) {
+    if (!deployment.launchAndBuy) {
+      // Dropping the buy silently would launch the token without the creator's
+      // first purchase and hand the opening price to whoever is watching.
+      throw new Error(
+        "This deployment has no launch-and-buy router configured, so an initial buy cannot be included.",
+      );
+    }
     return {
-      to: PONS_V2.launchAndBuy,
+      to: deployment.launchAndBuy,
       data: encodeFunctionData({
         abi: ponsLaunchAbi,
         functionName: "launchAndBuy",
@@ -96,7 +108,7 @@ export function encodeLaunch(draft: LaunchDraft, salt: Hex) {
     };
   }
   return {
-    to: PONS_V2.launchFactory,
+    to: deployment.launchFactory,
     data: encodeFunctionData({
       abi: ponsLaunchAbi,
       functionName: "launchToken",
@@ -106,9 +118,9 @@ export function encodeLaunch(draft: LaunchDraft, salt: Hex) {
 }
 
 /** Native value the transaction must carry: launch fee plus any native first buy. */
-export function launchValue(draft: LaunchDraft): bigint {
+export function launchValue(draft: LaunchDraft, fee: bigint): bigint {
   const nativeBuy = isNative(draft.quoteAsset) ? draft.initialBuy : 0n;
-  return OBSERVED_LAUNCH_FEE_WEI + nativeBuy;
+  return fee + nativeBuy;
 }
 
 /**
@@ -121,33 +133,64 @@ export async function preflightLaunch(draft: LaunchDraft): Promise<PreflightResu
   const client = rpc();
   const push = (c: PreflightCheck) => checks.push(c);
 
+  // 0. There must be a deployment to launch against at all.
+  const deployment = ACTIVE_DEPLOYMENT;
+  if (!deployment) {
+    return {
+      ok: false,
+      checks: [
+        {
+          id: "deployment",
+          label: "Pons deployment",
+          status: "fail",
+          detail: launchUnavailableReason()!,
+        },
+      ],
+    };
+  }
+
   // 1. Chain identity — never silently act on the wrong network.
   let chainOk = false;
   try {
     const chainId = await client.getChainId();
-    chainOk = chainId === PONS_V2.chainId;
+    chainOk = chainId === deployment.chainId;
     push({
       id: "chain",
       label: "Network",
       status: chainOk ? "pass" : "fail",
-      detail: chainOk ? "Robinhood Chain (4663)" : `Connected to chain ${chainId}, expected 4663.`,
+      detail: chainOk
+        ? `Connected to chain ${deployment.chainId}.`
+        : `Connected to chain ${chainId}, expected ${deployment.chainId}.`,
     });
   } catch {
     push({ id: "chain", label: "Network", status: "fail", detail: "Could not reach the network." });
   }
 
-  // 2. The factory must actually be a contract at the pinned address.
+  // 2. The factory must actually be a contract at the configured address.
   try {
-    const code = await client.getCode({ address: PONS_V2.launchFactory });
+    const code = await client.getCode({ address: deployment.launchFactory });
     const deployed = Boolean(code && code !== "0x");
     push({
       id: "factory",
       label: "Launch contract",
       status: deployed ? "pass" : "fail",
-      detail: deployed ? `Pons V2 factory verified at ${PONS_V2.launchFactory}` : "Factory bytecode missing.",
+      detail: deployed
+        ? `Factory verified at ${deployment.launchFactory}`
+        : `No contract deployed at ${deployment.launchFactory}.`,
     });
   } catch {
     push({ id: "factory", label: "Launch contract", status: "fail", detail: "Could not verify the factory." });
+  }
+
+  // 2b. The factory may be deployed but closed for launches.
+  const enabled = await launchEnabled();
+  if (enabled === false) {
+    push({
+      id: "launch-enabled",
+      label: "Launches open",
+      status: "fail",
+      detail: "This Pons deployment is not currently accepting launches.",
+    });
   }
 
   // 3. Pair allowlist — the check that stops us lying about "Paired with".
@@ -167,8 +210,10 @@ export async function preflightLaunch(draft: LaunchDraft): Promise<PreflightResu
     push({ id: "pair", label: "Pair asset", status: "fail", detail: "Could not confirm pair support." });
   }
 
-  // 4. Funds for the launch fee and any first buy.
-  const requiredNative = launchValue(draft);
+  // 4. Funds for the launch fee and any first buy. The fee is read from the
+  //    factory rather than assumed, because a different deployment may differ.
+  const fee = await launchFee();
+  const requiredNative = launchValue(draft, fee);
   let requiresApproval: PreflightResult["requiresApproval"];
   try {
     const balance = await client.getBalance({ address: draft.creator });
@@ -186,7 +231,16 @@ export async function preflightLaunch(draft: LaunchDraft): Promise<PreflightResu
   }
 
   // 5. ERC-20 pair assets need both balance and allowance before launching.
-  if (!isNative(draft.quoteAsset) && draft.initialBuy > 0n) {
+  //    The spender is the router, since that is the contract that pulls them.
+  const spender = deployment.launchAndBuy;
+  if (!isNative(draft.quoteAsset) && draft.initialBuy > 0n && !spender) {
+    push({
+      id: "router",
+      label: "Launch router",
+      status: "fail",
+      detail: "This deployment has no launch-and-buy router, so an initial buy isn't possible.",
+    });
+  } else if (!isNative(draft.quoteAsset) && draft.initialBuy > 0n && spender) {
     try {
       const [bal, allowance] = await Promise.all([
         client.readContract({
@@ -194,7 +248,7 @@ export async function preflightLaunch(draft: LaunchDraft): Promise<PreflightResu
         }),
         client.readContract({
           address: draft.quoteAsset, abi: erc20Abi, functionName: "allowance",
-          args: [draft.creator, PONS_V2.launchAndBuy],
+          args: [draft.creator, spender],
         }),
       ]);
       const hasBalance = bal >= draft.initialBuy;
@@ -214,7 +268,7 @@ export async function preflightLaunch(draft: LaunchDraft): Promise<PreflightResu
       if (!approved) {
         requiresApproval = {
           token: draft.quoteAsset,
-          spender: PONS_V2.launchAndBuy,
+          spender,
           amount: draft.initialBuy,
         };
       }
@@ -225,7 +279,7 @@ export async function preflightLaunch(draft: LaunchDraft): Promise<PreflightResu
 
   // 6. Simulate the exact transaction. This is the real gate.
   const salt = launchSalt(draft.creator, draft.symbol);
-  const { to, data } = encodeLaunch(draft, salt);
+  const { to, data } = encodeLaunch(draft, salt, deployment);
   let transaction: PreflightResult["transaction"];
 
   const blocking = checks.some((c) => c.status === "fail");

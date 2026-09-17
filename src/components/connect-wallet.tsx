@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useAccount, useChainId } from "wagmi";
 import { Button } from "@/components/ui";
-import { ROBINHOOD_CHAIN_ID, useSession, useSignIn, useSignOut, useWalletConnectors } from "@/lib/auth/use-auth";
+import { APP_CHAIN_ID, useSession, useSignIn, useSignOut, useWalletConnectors } from "@/lib/auth/use-auth";
 
 const short = (a: string) => `${a.slice(0, 6)}…${a.slice(-4)}`;
 
@@ -36,7 +36,7 @@ export function ConnectWallet() {
 
   // Connected but not authenticated — the distinction users must see.
   if (isConnected && address) {
-    const wrongNetwork = chainId !== ROBINHOOD_CHAIN_ID;
+    const wrongNetwork = chainId !== APP_CHAIN_ID;
     return (
       <div className="flex flex-col items-end gap-1">
         <Button
@@ -97,7 +97,7 @@ export function ConnectWallet() {
 export function UnsupportedNetworkNotice() {
   const { isConnected } = useAccount();
   const chainId = useChainId();
-  if (!isConnected || chainId === ROBINHOOD_CHAIN_ID) return null;
+  if (!isConnected || chainId === APP_CHAIN_ID) return null;
   return (
     <div className="border-b border-line bg-[#642b35]/5 px-5 py-2 text-center text-[13px] text-burgundy">
       Your wallet is connected to an unsupported network. Switch to Robinhood Chain to continue.

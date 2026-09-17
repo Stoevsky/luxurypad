@@ -1,6 +1,6 @@
 import { createConfig, http, injected } from "wagmi";
 import { coinbaseWallet, walletConnect } from "wagmi/connectors";
-import { robinhoodChain } from "./robinhood";
+import { appChain } from "./robinhood";
 
 const projectId = process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID;
 
@@ -11,7 +11,7 @@ const projectId = process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID;
  * registering it without one throws at runtime.
  */
 export const wagmiConfig = createConfig({
-  chains: [robinhoodChain],
+  chains: [appChain],
   connectors: [
     injected({ shimDisconnect: true }),
     coinbaseWallet({ appName: "LuxuryPad", preference: "all" }),
@@ -31,7 +31,7 @@ export const wagmiConfig = createConfig({
       : []),
   ],
   transports: {
-    [robinhoodChain.id]: http(
+    [appChain.id]: http(
       process.env.NEXT_PUBLIC_RPC_URL ?? "https://rpc.mainnet.chain.robinhood.com",
     ),
   },

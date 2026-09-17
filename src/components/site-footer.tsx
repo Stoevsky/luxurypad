@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { Container, Rule } from "@/components/ui";
-import { PONS_V2 } from "@/lib/pons/contracts";
+import { ACTIVE_DEPLOYMENT, APP_CHAIN_ID } from "@/lib/pons/deployment";
 
 export function SiteFooter() {
   return (
@@ -32,7 +32,9 @@ export function SiteFooter() {
           endorsement or partnership.
         </p>
         <p className="mt-4 text-[11px] text-muted tabular">
-          Pons V2 · factory {PONS_V2.launchFactory.slice(0, 10)}… · Robinhood Chain {PONS_V2.chainId}
+          {ACTIVE_DEPLOYMENT
+            ? `${ACTIVE_DEPLOYMENT.protocolVersion} · factory ${ACTIVE_DEPLOYMENT.launchFactory.slice(0, 10)}… · chain ${ACTIVE_DEPLOYMENT.chainId}`
+            : `No Pons deployment configured for chain ${APP_CHAIN_ID} — launching is disabled.`}
         </p>
       </Container>
     </footer>

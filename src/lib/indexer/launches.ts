@@ -1,5 +1,5 @@
 import { parseAbiItem, type Address, type Hex } from "viem";
-import { PONS_V2 } from "@/lib/pons/contracts";
+import { ACTIVE_DEPLOYMENT } from "@/lib/pons/deployment";
 import { rpc, withRpc } from "@/lib/pons/client";
 import { singleFlight } from "@/lib/cache";
 import { readCurveState, readTokenMeta, graduationProgress, phaseOf, type LaunchPhase } from "@/lib/pons/curve";
@@ -54,12 +54,14 @@ async function scanLaunchesUncached(window: bigint = DEFAULT_WINDOW): Promise<In
   // Guard the default explicitly: an undefined window here would scan from
   // genesis and blow past the node's 10,000-log ceiling.
   const span = window > 0n ? window : DEFAULT_WINDOW;
+  const deployment = ACTIVE_DEPLOYMENT;
+  if (!deployment) return [];
   return withRpc(async () => {
     const client = rpc();
     const head = await client.getBlockNumber();
     const fromBlock = head > span ? head - span : 0n;
     const logs = await client.getLogs({
-      address: PONS_V2.launchFactory,
+      address: deployment.launchFactory,
       event: TOKEN_LAUNCHED_EVENT,
       fromBlock,
       toBlock: head,
@@ -76,8 +78,8 @@ async function scanLaunchesUncached(window: bigint = DEFAULT_WINDOW): Promise<In
           graduationThreshold: l.args.graduationThreshold as bigint,
           blockNumber: l.blockNumber,
           txHash: l.transactionHash,
-          factory: PONS_V2.launchFactory,
-          protocolVersion: PONS_V2.protocolVersion,
+          factory: deployment.launchFactory,
+          protocolVersion: deployment.protocolVersion,
         }),
       )
       .reverse(); // newest first

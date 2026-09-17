@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { listLaunches, scanLaunches, findLaunchByToken, sectionOf } from "@/lib/indexer/launches";
-import { PONS_V2 } from "@/lib/pons/contracts";
+import { requireDeployment } from "@/lib/pons/deployment";
+
+const PONS_V2 = requireDeployment();
 
 describe("launch indexer", () => {
   it("reads real TokenLaunched events from the Pons factory", async () => {
@@ -20,14 +22,16 @@ describe("launch indexer", () => {
   it("bounds the default scan window instead of scanning from genesis", async () => {
     // Regression: losing the default window made this query start at block 0,
     // which the node rejects once it matches more than 10,000 logs.
-    const { createPublicClient, http } = await import("viem");
-    const client = createPublicClient({ transport: http("https://rpc.mainnet.chain.robinhood.com") });
-    const head = await client.getBlockNumber();
+    //
+    // Asserted as the span of the returned blocks rather than the distance from
+    // a freshly-read head: `scanLaunches` is singleFlight-cached for 30s, so a
+    // head read here can be newer than the head the cached scan actually used,
+    // which made the head-relative form fail intermittently by a few blocks.
     const launches = await scanLaunches();
     expect(launches.length).toBeGreaterThan(0);
-    for (const l of launches) {
-      expect(head - l.blockNumber).toBeLessThanOrEqual(20_000n);
-    }
+    const blocks = launches.map((l) => l.blockNumber);
+    const span = blocks.reduce((a, b) => (b > a ? b : a)) - blocks.reduce((a, b) => (b < a ? b : a));
+    expect(span).toBeLessThanOrEqual(20_000n);
   });
 
   it("returns newest first", async () => {

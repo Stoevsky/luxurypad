@@ -1,5 +1,5 @@
 import { createPublicClient, fallback, http, type PublicClient } from "viem";
-import { robinhoodChain } from "@/lib/chain/robinhood";
+import { appChain } from "@/lib/chain/robinhood";
 
 let client: PublicClient | null = null;
 
@@ -19,7 +19,7 @@ export function rpc(): PublicClient {
     transports.push(http(secondary, { timeout: 15_000, retryCount: 2, retryDelay: 250 }));
   }
   client = createPublicClient({
-    chain: robinhoodChain,
+    chain: appChain,
     transport: transports.length > 1 ? fallback(transports) : transports[0],
     batch: { multicall: { wait: 16 } },
   }) as PublicClient;

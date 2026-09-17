@@ -2,7 +2,7 @@ import { ImageResponse } from "next/og";
 import { isAddress, type Address } from "viem";
 import { findLaunchByToken } from "@/lib/indexer/launches";
 import { readCurveState, readTokenMeta, graduationProgress } from "@/lib/pons/curve";
-import { resolveLuxuryMarkets } from "@/lib/registry/resolve";
+import { resolveLuxuryMarkets, pairingLabel } from "@/lib/registry/resolve";
 
 export const alt = "LuxuryPad launch";
 export const size = { width: 1200, height: 630 };
@@ -36,11 +36,7 @@ export default async function Image({ params }: { params: Promise<{ address: str
         const market = registry.markets.find(
           (m) => m.asset?.address.toLowerCase() === state.quoteAsset.toLowerCase(),
         );
-        pairing = state.isNativeQuote
-          ? "Paired with ETH"
-          : market?.state === "PAIR_AVAILABLE"
-            ? `Paired with ${market.company.companyName} Stock Token`
-            : "Paired with a Stock Token";
+        pairing = pairingLabel(market, { isNativeQuote: state.isNativeQuote });
       }
     } catch {
       /* fall back to the brand card rather than render a wrong claim */

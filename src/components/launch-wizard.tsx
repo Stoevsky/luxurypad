@@ -391,7 +391,13 @@ export function LaunchWizard({
             <dl className="grid gap-4 sm:grid-cols-2 text-[14px]">
               <Row
                 k="Paired with"
-                v={selected?.asset ? `${selected.company.companyName} Stock Token` : "ETH"}
+                v={
+                  selected?.asset
+                    ? selected.assetSource === "luxury-pair"
+                      ? selected.asset.symbol
+                      : `${selected.company.companyName} Stock Token`
+                    : "ETH"
+                }
               />
               <Row k="Creator" v={address ? `${address.slice(0, 10)}…` : "—"} />
               <Row k="Creator tax" v={`${(creatorTaxBps / 100).toFixed(2)}%`} />

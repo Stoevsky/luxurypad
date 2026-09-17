@@ -2,7 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAccount, useChainId, useConnect, useDisconnect, useSignMessage, useSwitchChain } from "wagmi";
-import { ROBINHOOD_CHAIN_ID } from "@/lib/chain/robinhood";
+import { APP_CHAIN_ID } from "@/lib/pons/deployment";
 import { SIWE_STATEMENT } from "@/lib/auth/siwe.shared";
 
 export type SessionInfo = { address: `0x${string}`; chainId: number } | null;
@@ -36,8 +36,8 @@ export function useSignIn() {
     mutationFn: async () => {
       if (!isConnected || !address) throw new Error("Connect a wallet first.");
 
-      if (chainId !== ROBINHOOD_CHAIN_ID) {
-        await switchChainAsync({ chainId: ROBINHOOD_CHAIN_ID });
+      if (chainId !== APP_CHAIN_ID) {
+        await switchChainAsync({ chainId: APP_CHAIN_ID });
       }
 
       const nonceRes = await fetch("/api/auth/nonce", { cache: "no-store" });
@@ -53,7 +53,7 @@ export function useSignIn() {
         "",
         `URI: ${window.location.origin}`,
         "Version: 1",
-        `Chain ID: ${ROBINHOOD_CHAIN_ID}`,
+        `Chain ID: ${APP_CHAIN_ID}`,
         `Nonce: ${nonce}`,
         `Issued At: ${now.toISOString()}`,
         `Expiration Time: ${new Date(now.getTime() + 5 * 60_000).toISOString()}`,
@@ -95,4 +95,4 @@ export function useWalletConnectors() {
   return { connectors, connectAsync, isPending, error };
 }
 
-export { ROBINHOOD_CHAIN_ID };
+export { APP_CHAIN_ID };
