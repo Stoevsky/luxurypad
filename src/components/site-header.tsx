@@ -3,6 +3,7 @@ import { Container } from "@/components/ui";
 import { ConnectWallet, UnsupportedNetworkNotice } from "@/components/connect-wallet";
 import { SearchTrigger } from "@/components/search";
 import { Crown } from "@/components/crown";
+import { CaBanner } from "@/components/ca-banner";
 
 const NAV = [
   { href: "/explore", label: "Explore" },
@@ -15,6 +16,7 @@ const NAV = [
 export function SiteHeader() {
   return (
     <header className="sticky top-0 z-40 border-b border-line bg-ground/85 backdrop-blur-sm">
+      <CaBanner />
       <UnsupportedNetworkNotice />
       <Container className="flex h-16 items-center justify-between gap-4">
         <div className="flex items-center gap-8">
